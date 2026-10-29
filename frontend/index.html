@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="ChainProof 链证：基于 Solidity、Ganache 与 MySQL 的文件哈希存证 DApp。上传文件，将 SHA-256 指纹写入区块链，随时查验文件是否被篡改。"
+    />
+    <meta name="theme-color" content="#0b1526" />
+    <title>ChainProof 链证 · Solidity 文件存证 DApp</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">跳到存证工具</a>
+    <div class="page-aurora" aria-hidden="true"></div>
+    <div class="page-grid" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#" aria-label="ChainProof 链证首页">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28" fill="none">
+              <rect x="1" y="1" width="26" height="26" rx="8" stroke="currentColor" stroke-width="1.5" />
+              <path d="M8.5 10h11M8.5 14h11M8.5 18h6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              <circle cx="21" cy="18" r="2.5" fill="currentColor" />
+            </svg>
+          </span>
+          <span class="brand-type">
+            <strong>ChainProof</strong>
+            <small>链 证</small>
+          </span>
+        </a>
+
+        <nav class="site-nav" aria-label="页面导航">
+          <a href="#workspace">存证台</a>
+          <a href="#records">存证记录</a>
+          <a href="#how-it-works">工作原理</a>
+        </nav>
+
+        <div class="health-pill" id="health-pill" data-state="loading" title="正在检查本地服务">
+          <span class="health-dot" aria-hidden="true"></span>
+          <span id="health-text">正在连接</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero container" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="eyebrow-line" aria-hidden="true"></span>
+            SHA-256 · LOCAL GANACHE · MYSQL
+          </p>
+          <h1 id="hero-title">把文件的<span class="highlight">可信</span>，<br />写进区块链。</h1>
+          <p class="hero-lede">
+            上传任意文件，系统计算唯一 SHA-256 指纹并锚定到智能合约。
+            原文无需上链，只凭一个哈希，就能证明内容是否被改动。
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#workspace">
+              开始存证
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
+            <a class="button button-quiet" href="#how-it-works">看看怎么实现</a>
+          </div>
+          <ul class="hero-facts" aria-label="项目特性">
+            <li><span>01</span> 文件原文不落库</li>
+            <li><span>02</span> 链上链下分离</li>
+            <li><span>03</span> 一键完整性查验</li>
+          </ul>
+        </div>
+
+        <aside class="proof-card" aria-label="链上存证数据示意">
+          <div class="proof-card-top">
+            <span class="mono-label">ON-CHAIN PROOF</span>
+            <span class="live-badge"><i aria-hidden="true"></i> LOCAL</span>
+          </div>
+          <div class="proof-file">
+            <div class="proof-file-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6 3.75h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5" />
+                <path d="M14 3.75v4h4M8.5 12h6M8.5 15.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div>
+              <strong>文件指纹</strong>
+              <span class="file-size">SHA-256 / 32 bytes</span>
+            </div>
+            <span class="proof-check" aria-label="哈希已锚定">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="m3.5 8.2 3 3L12.5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </div>
+          <div class="hash-display">
+            <span>FILE HASH</span>
+            <code id="hero-hash">等待第一条存证写入…</code>
+          </div>
+          <div class="proof-meta">
+            <div>
+              <span>BLOCK</span>
+              <strong id="hero-block"># —</strong>
+            </div>
+            <div>
+              <span>CHAIN ID</span>
+              <strong id="hero-chain">—</strong>
+            </div>
+            <div>
+              <span>CONTRACT</span>
+              <strong id="hero-contract">未部署</strong>
+            </div>
+          </div>
+          <div class="proof-footer">
+            <span class="seal-line" aria-hidden="true"></span>
+            <span>INTEGRITY, WRITTEN IN STONE.</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="trust-strip" aria-label="技术要点">
+        <div class="container trust-inner">
+          <div class="trust-item">
+            <strong>SHA-256</strong>
+            <span>密码学哈希 · 不可逆</span>
+          </div>
+          <div class="trust-item">
+            <strong>0 bytes</strong>
+            <span>文件原文不上链</span>
+          </div>
+          <div class="trust-item">
+            <strong>100%</strong>
+            <span>本地私有链可验证</span>
+          </div>
+          <div class="trust-item">
+            <strong>2 份记录</strong>
+            <span>链上锚点 + 链下业务</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace container" id="workspace" aria-labelledby="workspace-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span> EVIDENCE WORKSPACE</p>
+            <h2 id="workspace-title">存证与控制台</h2>
+          </div>
+          <p class="section-note">文件只在内存中经过哈希计算，随后立即释放。</p>
+        </div>
+
+        <div class="console">
+          <div class="console-topbar">
+            <div class="console-tabs" role="tablist" aria-label="存证操作">
+              <button
+                class="console-tab is-active"
+                id="tab-notarize"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-notarize"
+                data-tab="notarize"
+              >
+                <span class="tab-index">01</span>
+                存证上链
+              </button>
+              <button
+                class="console-tab"
+                id="tab-verify"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-verify"
+                data-tab="verify"
+              >
+                <span class="tab-index">02</span>
+                查验文件
+              </button>
+            </div>
+            <span class="console-status"><i aria-hidden="true"></i> 本地私有链 · 仅本机数据</span>
+          </div>
+
+          <div class="console-body">
+            <section
+              class="tab-panel"
+              id="panel-notarize"
+              role="tabpanel"
+              aria-labelledby="tab-notarize"
+            >
+              <form id="notarize-form" novalidate>
+                <div class="form-layout">
+                  <div class="form-main">
+                    <div class="field-heading">
+                      <label id="notarize-drop-label" class="field-label">选择要存证的文件</label>
+                      <span class="field-kicker">STEP 01 / UPLOAD</span>
+                    </div>
+                    <div
+                      class="dropzone"
+                      id="notarize-dropzone"
+                      role="button"
+                      tabindex="0"
+                      aria-labelledby="notarize-drop-label"
+                      aria-describedby="notarize-drop-help"
+                    >
+                      <input
+                        class="visually-hidden"
+                        type="file"
+                        id="notarize-input"
+                        aria-labelledby="notarize-drop-label"
+                      />
+                      <div class="dropzone-empty" id="notarize-empty">
+                        <span class="drop-icon" aria-hidden="true">
+                          <svg viewBox="0 0 32 32" fill="none">
+                            <path d="M16 22V7m0 0-5.5 5.5M16 7l5.5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M6 20.5v4.25A2.25 2.25 0 0 0 8.25 27h15.5A2.25 2.25 0 0 0 26 24.75V20.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                          </svg>
+                        </span>
+                        <strong>拖拽文件到这里</strong>
+                        <span id="notarize-drop-help">
+                          或 <em>点击选择文件</em> · 单个文件不超过 <span data-max-file>10</span> MB
+                        </span>
+                      </div>
+                      <div class="file-chip" id="notarize-file" hidden>
+                        <span class="file-chip-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M6 3.75h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5" />
+                            <path d="M14 3.75v4h4M9 14h6M9 17h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                          </svg>
+                        </span>
+                        <span class="file-chip-text">
+                          <strong id="notarize-filename">—</strong>
+                          <small id="notarize-filesize">—</small>
+                        </span>
+                        <button type="button" class="file-remove" id="notarize-remove" aria-label="移除所选文件">移除</button>
+                      </div>
+                    </div>
+                    <p class="field-help">
+                      哈希由后端以流式方式计算，文件内容不会写入磁盘，也不会保存进数据库。
+                    </p>
+                  </div>
+
+                  <div class="form-side">
+                    <div class="field-heading">
+                      <label class="field-label" for="notarize-user">操作人</label>
+                      <span class="field-kicker">STEP 02 / SIGN</span>
+                    </div>
+                    <input
+                      class="text-input"
+                      id="notarize-user"
+                      name="user_name"
+                      type="text"
+                      maxlength="40"
+                      autocomplete="name"
+                      placeholder="例如：张三 / 实验室 A"
+                    />
+                    <p class="field-help">
+                      仅作为链下业务标签，不写入链上，也不代表身份认证。会保存在浏览器中方便下次使用。
+                    </p>
+
+                    <div class="form-divider"></div>
+
+                    <div class="flow-note">
+                      <span class="flow-note-index">HASH</span>
+                      <p>后端计算 SHA-256</p>
+                      <span class="flow-arrow" aria-hidden="true">→</span>
+                      <span class="flow-note-index">CHAIN</span>
+                      <p>调用合约写入摘要</p>
+                    </div>
+
+                    <button class="button button-primary button-full" id="notarize-submit" type="submit">
+                      <span class="button-label">计算哈希并存证</span>
+                      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+                    <div class="upload-progress" id="notarize-progress" hidden aria-live="polite">
+                      <div class="progress-track"><span id="notarize-progress-bar"></span></div>
+                      <span id="notarize-progress-text">准备上传…</span>
+                    </div>
+                    <p class="privacy-note">
+                      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M8 1.75 13 3.8v3.8c0 3.1-2.05 5.45-5 6.65-2.95-1.2-5-3.55-5-6.65V3.8L8 1.75Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+                        <path d="m5.8 7.8 1.5 1.5 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      只保存文件名、摘要和操作记录，不保存文件内容。
+                    </p>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            <section
+              class="tab-panel"
+              id="panel-verify"
+              role="tabpanel"
+              aria-labelledby="tab-verify"
+              hidden
+            >
+              <form id="verify-form" novalidate>
+                <div class="form-layout">
+                  <div class="form-main">
+                    <div class="field-heading">
+                      <label id="verify-drop-label" class="field-label">上传需要查验的文件</label>
+                      <span class="field-kicker">VERIFY / FILE</span>
+                    </div>
+                    <div
+                      class="dropzone dropzone-compact"
+                      id="verify-dropzone"
+                      role="button"
+                      tabindex="0"
+                      aria-labelledby="verify-drop-label"
+                      aria-describedby="verify-drop-help"
+                    >
+                      <input
+                        class="visually-hidden"
+                        type="file"
+                        id="verify-input"
+                        aria-labelledby="verify-drop-label"
+                      />
+                      <div class="dropzone-empty" id="verify-empty">
+                        <span class="drop-icon" aria-hidden="true">
+                          <svg viewBox="0 0 32 32" fill="none">
+                            <circle cx="14.5" cy="14.5" r="7" stroke="currentColor" stroke-width="1.7" />
+                            <path d="m20 20 6 6M14.5 11.5v6M11.5 14.5h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                          </svg>
+                        </span>
+                        <strong>放入文件，重新计算指纹</strong>
+                        <span id="verify-drop-help">或 <em>点击选择文件</em> · 文件不会上传保存</span>
+                      </div>
+                      <div class="file-chip" id="verify-file" hidden>
+                        <span class="file-chip-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M6 3.75h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5" />
+                            <path d="M14 3.75v4h4M9 14h6M9 17h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                          </svg>
+                        </span>
+                        <span class="file-chip-text">
+                          <strong id="verify-filename">—</strong>
+                          <small id="verify-filesize">—</small>
+                        </span>
+                        <button type="button" class="file-remove" id="verify-remove" aria-label="移除所选文件">移除</button>
+                      </div>
+                    </div>
+
+                    <div class="or-divider"><span>或者直接输入哈希</span></div>
+
+                    <div class="field-heading">
+                      <label class="field-label" for="verify-hash">SHA-256 哈希</label>
+                      <span class="field-kicker">HASH / HEX</span>
+                    </div>
+                    <input
+                      class="text-input text-input-mono"
+                      id="verify-hash"
+                      type="text"
+                      inputmode="text"
+                      spellcheck="false"
+                      autocomplete="off"
+                      placeholder="粘贴 64 位十六进制哈希，可带 0x 前缀"
+                    />
+                    <p class="field-help" id="verify-hint">上传文件后系统会自动计算哈希；也可以直接粘贴已存证的哈希进行查询。</p>
+                  </div>
+
+                  <div class="form-side">
+                    <div class="field-heading">
+                      <label class="field-label" for="verify-user">查验人 <span class="optional">（可选）</span></label>
+                      <span class="field-kicker">AUDIT / LOG</span>
+                    </div>
+                    <input
+                      class="text-input"
+                      id="verify-user"
+                      name="user_name"
+                      type="text"
+                      maxlength="40"
+                      placeholder="匿名访客"
+                    />
+                    <p class="field-help">查验动作会写入链下操作日志，便于演示审计链路。</p>
+
+                    <div class="form-divider"></div>
+
+                    <div class="check-note">
+                      <span class="check-note-icon" aria-hidden="true">
+                        <svg viewBox="0 0 20 20" fill="none">
+                          <path d="M10 2.5 16 5v4.5c0 3.7-2.4 6.5-6 8-3.6-1.5-6-4.3-6-8V5l6-2.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                          <path d="m7.2 9.7 1.9 1.9 3.8-3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </span>
+                      <p>以链上摘要为准。若链下记录被修改，系统会明确提示不一致，而不是直接判为通过。</p>
+                    </div>
+
+                    <button class="button button-dark button-full" id="verify-submit" type="submit">
+                      <span class="button-label">开始查验</span>
+                      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="m3 8.2 3 3L13 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+                    <div class="upload-progress" id="verify-progress" hidden aria-live="polite">
+                      <div class="progress-track"><span id="verify-progress-bar"></span></div>
+                      <span id="verify-progress-text">准备查验…</span>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <section class="result-section" id="result-section" hidden aria-live="polite">
+          <div class="result-card" id="result-card" aria-label="操作结果"></div>
+        </section>
+      </section>
+
+      <section class="records container" id="records" aria-labelledby="records-title">
+        <div class="section-heading section-heading-inline">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span> CHAIN-OFF LEDGER</p>
+            <h2 id="records-title">最近存证记录</h2>
+          </div>
+          <button class="text-button" id="refresh-records" type="button">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M13.2 6.6A5.5 5.5 0 1 0 13 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M13.2 2.8v3.8H9.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            刷新记录
+          </button>
+        </div>
+
+        <div class="records-panel">
+          <div class="table-scroll">
+            <table class="records-table">
+              <thead>
+                <tr>
+                  <th scope="col">文件</th>
+                  <th scope="col">文件哈希</th>
+                  <th scope="col">操作人</th>
+                  <th scope="col">区块高度</th>
+                  <th scope="col">上链时间</th>
+                  <th scope="col" class="align-right">操作</th>
+                </tr>
+              </thead>
+              <tbody id="records-body">
+                <tr class="table-placeholder">
+                  <td colspan="6">
+                    <span class="loading-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                    正在读取链下记录…
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="records-foot">
+            <span>链下记录仅用于展示与检索，最终证明以链上存证为准。</span>
+            <span class="records-count" id="records-count">—</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="how container" id="how-it-works" aria-labelledby="how-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span> HOW IT WORKS</p>
+            <h2 id="how-title">四步，完成一次可信存证</h2>
+          </div>
+          <p class="section-note">从文件到区块，每一步都可以被验证与复现。</p>
+        </div>
+
+        <div class="steps">
+          <article class="step">
+            <span class="step-number">01</span>
+            <span class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6 3.75h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5" />
+                <path d="M14 3.75v4h4M8.5 12h6M8.5 15.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </span>
+            <h3>选择文件</h3>
+            <p>浏览器将文件交给后端，系统以 1 MB 为单位流式计算 SHA-256。</p>
+          </article>
+          <article class="step">
+            <span class="step-number">02</span>
+            <span class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 7.5h16M4 12h16M4 16.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <circle cx="18.5" cy="16.5" r="2.5" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </span>
+            <h3>哈希锚定</h3>
+            <p>32 字节摘要写入 Solidity 合约，同时记录 msg.sender 与区块时间戳。</p>
+          </article>
+          <article class="step">
+            <span class="step-number">03</span>
+            <span class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <ellipse cx="12" cy="6.5" rx="7.5" ry="3" stroke="currentColor" stroke-width="1.5" />
+                <path d="M4.5 6.5v11c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-11M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </span>
+            <h3>链下留痕</h3>
+            <p>文件名、区块高度、交易哈希和操作人写入 MySQL，便于检索与审计。</p>
+          </article>
+          <article class="step">
+            <span class="step-number">04</span>
+            <span class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3 19 5.9v5.4c0 4.3-2.8 7.5-7 9.3-4.2-1.8-7-5-7-9.3V5.9L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                <path d="m8.7 11.7 2.2 2.2 4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <h3>随时查验</h3>
+            <p>重新上传文件或输入哈希，对比链上/链下记录，立即发现是否被篡改。</p>
+          </article>
+        </div>
+
+        <div class="design-note">
+          <span class="design-note-label">DESIGN NOTE</span>
+          <p>
+            链上只保存摘要、时间和写入账户；链下保存可变业务信息。这样既降低链上存储成本，
+            又保留了用哈希独立验证内容完整性的能力。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div class="footer-brand">
+          <span class="brand-mark brand-mark-small" aria-hidden="true">
+            <svg viewBox="0 0 28 28" fill="none">
+              <rect x="1" y="1" width="26" height="26" rx="8" stroke="currentColor" stroke-width="1.5" />
+              <path d="M8.5 10h11M8.5 14h11M8.5 18h6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              <circle cx="21" cy="18" r="2.5" fill="currentColor" />
+            </svg>
+          </span>
+          <div>
+            <strong>ChainProof · 链证</strong>
+            <p>Solidity 智能合约存证 DApp · 入门级区块链工程实践</p>
+          </div>
+        </div>
+        <div class="footer-meta">
+          <span class="tech-tag">Solidity</span>
+          <span class="tech-tag">Ganache</span>
+          <span class="tech-tag">Flask</span>
+          <span class="tech-tag">MySQL</span>
+          <span class="copyright">© <span id="year">2026</span> · MIT License</span>
+        </div>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <noscript>
+      <div class="noscript">需要启用 JavaScript 才能使用文件存证与查验功能。</div>
+    </noscript>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
